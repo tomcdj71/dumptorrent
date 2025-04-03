@@ -1,16 +1,42 @@
 cmake_minimum_required(VERSION 3.5)
 project(dumptorrent)
+set(DUMPTORRENT_VERSION "1.6.0")
+include_directories(${PROJECT_SOURCE_DIR}/include)
 
-set(SOURCE_DUMP dumptorrent.c benc.c benc.h scrapec.c scrapec.h sha1.c sha1.h common.h)
-set(SOURCE_SCRAPE scrapec.c scrapec.h benc.c benc.h sha1.c sha1.h common.h)
+# ------------------------------------------------------------------------------
+# dumptorrent target
+# ------------------------------------------------------------------------------
+set(DUMPTORRENT_SOURCES
+    src/main.c
+    src/torrent.c
+    src/benc.c
+    src/scrapec.c
+    src/sha1.c
+)
 
-add_executable(dumptorrent ${SOURCE_DUMP})
-add_executable(scrapec ${SOURCE_SCRAPE})
+add_executable(dumptorrent
+    ${DUMPTORRENT_SOURCES}
+)
+target_compile_definitions(dumptorrent
+    PRIVATE
+        DUMPTORRENT_VERSION="${DUMPTORRENT_VERSION}"
+)
 
-target_compile_definitions(scrapec PUBLIC BUILD_MAIN)
-if(WIN32)
-  target_link_libraries(dumptorrent wsock32 ws2_32)
-  target_link_libraries(scrapec wsock32 ws2_32)
-  target_compile_definitions(dumptorrent PUBLIC _CRT_SECURE_NO_WARNINGS)
-  target_compile_definitions(scrapec PUBLIC _CRT_SECURE_NO_WARNINGS BUILD_MAIN)
-endif()
+# ------------------------------------------------------------------------------
+# scrapec target
+# ------------------------------------------------------------------------------
+set(SCRAPE_SOURCES
+    src/scrapec.c
+    src/benc.c
+    src/sha1.c
+)
+
+add_executable(scrapec
+    ${SCRAPE_SOURCES}
+)
+
+target_compile_definitions(scrapec
+    PUBLIC
+        BUILD_MAIN
+        DUMPTORRENT_VERSION="${DUMPTORRENT_VERSION}"
+)

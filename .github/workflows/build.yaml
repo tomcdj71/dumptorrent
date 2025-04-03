@@ -30,8 +30,23 @@ jobs:
           echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
           echo "package-dir=${{ github.workspace }}/package" >> "$GITHUB_OUTPUT"
           echo "artifact-dir=${{ github.workspace }}/artifacts/" >> "$GITHUB_OUTPUT"
-          version=$(grep -oP '(?<=VERSION=).*' VERSIONING)
+          version=$(grep -oP '(?<=set\(DUMPTORRENT_VERSION ")[^"]*' CMakeLists.txt)
           echo "version=$version" >> "$GITHUB_OUTPUT"
+      
+      - name: Check if version is lower than tag
+        id: check_version
+        shell: bash
+        run: |
+            latest_tag=$(git tag --sort=-v:refname | head -n 1)
+            echo "latest_tag=$latest_tag" >> "$GITHUB_OUTPUT"
+            if [ -z "$latest_tag" ]; then
+            echo "No tags found. Proceeding with build."
+            elif [ "$latest_tag" != "v${{ steps.strings.outputs.version }}" ]; then
+            echo "Version in CMakeLists.txt is higher than the latest tag. Proceeding with build."
+            else
+            echo "Version in CMakeLists.txt is lower or equal to the latest tag. Skipping build."
+            exit 1
+            fi
 
       - name: Build
         id: build

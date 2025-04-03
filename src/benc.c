@@ -2,11 +2,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
-
-#ifdef _WIN32
-	#define snprintf _snprintf
-#endif
-
 #include "common.h"
 #include "sha1.h"
 #include "benc.h"
@@ -371,7 +366,9 @@ struct benc_entity *benc_parse_stream (FILE *stream, char *errbuf)
 				return NULL;
 			}
 			ungetc(c, stream);
-			fscanf(stream, "%d", &length);
+			if (fscanf(stream, "%d", &length) != 1) {
+				snprintf(errbuf, ERRBUF_SIZE, "Failed to read length from stream");
+			}
 			c = getc(stream);
 			if (c != ':') {
 				snprintf(errbuf, ERRBUF_SIZE, "expecting :, but get %c", c);

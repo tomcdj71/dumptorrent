@@ -2,32 +2,22 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-
-#ifdef _WIN32
-  #include <winsock2.h>
-  #include <windows.h>
-  #define snprintf _snprintf
-#else
-  #include <unistd.h>
-  #include <netinet/in.h>
-  #include <sys/socket.h>
-  #include <arpa/inet.h>
-  #include <netdb.h>
-#endif
-
+#include <unistd.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netdb.h>
 #include "common.h"
 #include "benc.h"
-
-#ifdef _WIN32
-  #define CLOSESOCKET(s) closesocket(s)
-#else
-  #define CLOSESOCKET(s) close(s)
-#endif
+#include "torrent.h"
+#define CLOSESOCKET(s) close(s)
 
 /* -------------------------------------------------------------------------
    VERSION DEFINITION (for standalone usage)
    ------------------------------------------------------------------------- */
-#define SCRAPE_VERSION "1.4.0"
+#ifndef DUMPTORRENT_VERSION
+#define DUMPTORRENT_VERSION "unknown"
+#endif
 
 /* -------------------------------------------------------------------------
    EXTERNAL OPTION (used by dumptorrent + scrape)
@@ -72,8 +62,8 @@ static int parse_url(struct url_struct *url_struct, const char *url, char *errbu
             snprintf(errbuf, ERRBUF_SIZE, "hostname is too long.");
             return 1;
         }
-        strcpy(url_struct->host, ptr);
-        strcpy(url_struct->path, "/");
+        strncpy(url_struct->host, ptr, 64);
+        strncpy(url_struct->path, "/", 64);
     } else {
         /* We do have a path portion */
         if (strlen(ptr) >= 64) {
@@ -87,7 +77,7 @@ static int parse_url(struct url_struct *url_struct, const char *url, char *errbu
             snprintf(errbuf, ERRBUF_SIZE, "path is too long.");
             return 1;
         }
-        strcpy(url_struct->path, ptr2);
+        strncpy(url_struct->path, ptr2, 64);
     }
 
     /* Check for user:pass@host type cases (not supported) */
@@ -106,7 +96,7 @@ static int parse_url(struct url_struct *url_struct, const char *url, char *errbu
         }
         url_struct->port = 80; /* default for HTTP */
     } else {
-        url_struct->port = atoi(ptr + 1);
+        url_struct->port = strtol(ptr + 1, NULL, 10);
         if (url_struct->port <= 0) {
             snprintf(errbuf, ERRBUF_SIZE, "invalid port specified.");
             return 1;
@@ -204,7 +194,7 @@ errout2:
     return 1;
 
 errout1:
-    snprintf(errbuf, ERRBUF_SIZE, "bad HTTP response: %s", buffer);
+    snprintf(errbuf, ERRBUF_SIZE, "bad HTTP response: %.80s", buffer);
     errbuf[ERRBUF_SIZE - 1] = '\0';
     return 1;
 }
@@ -215,7 +205,7 @@ errout1:
 static int scrapec_http(const char *host, int port, const char *path,
                         const unsigned char *info_hash, int *result, char *errbuf)
 {
-    char buffer[4096];
+    char buffer[8192];
     int buffer_length;
     struct hostent *hostent;
     int sock;
@@ -260,16 +250,6 @@ static int scrapec_http(const char *host, int port, const char *path,
 
     /* Set timeouts if any */
     if (option_timeout != 0) {
-#ifdef _WIN32
-        int timeout_ms = option_timeout * 1000;
-        if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout_ms, sizeof(timeout_ms)) == -1 ||
-            setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (char*)&timeout_ms, sizeof(timeout_ms)) == -1)
-        {
-            snprintf(errbuf, ERRBUF_SIZE, "setsockopt timeout error");
-            CLOSESOCKET(sock);
-            return 1;
-        }
-#else
         struct timeval timeoutval = {option_timeout, 0};
         if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeoutval, sizeof(timeoutval)) == -1 ||
             setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &timeoutval, sizeof(timeoutval)) == -1)
@@ -278,7 +258,6 @@ static int scrapec_http(const char *host, int port, const char *path,
             CLOSESOCKET(sock);
             return 1;
         }
-#endif
     }
 
     /* Connect */
@@ -376,16 +355,6 @@ static int scrapec_udp(const char *host, int port,
 
     /* Timeouts if any */
     if (option_timeout != 0) {
-#ifdef _WIN32
-        int timeout_ms = option_timeout * 1000;
-        if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout_ms, sizeof(timeout_ms)) == -1 ||
-            setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (char*)&timeout_ms, sizeof(timeout_ms)) == -1)
-        {
-            snprintf(errbuf, ERRBUF_SIZE, "setsockopt timeout error (UDP)");
-            CLOSESOCKET(sock);
-            return 1;
-        }
-#else
         struct timeval timeoutval = {option_timeout, 0};
         if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeoutval, sizeof(timeoutval)) == -1 ||
             setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &timeoutval, sizeof(timeoutval)) == -1)
@@ -394,7 +363,6 @@ static int scrapec_udp(const char *host, int port,
             CLOSESOCKET(sock);
             return 1;
         }
-#endif
     }
 
     /* 'connect' UDP (really just sets default peer) */
@@ -472,20 +440,6 @@ static int scrapec_udp(const char *host, int port,
 int scrapec(const char *url, const unsigned char *info_hash, int *result, char *errbuf)
 {
     struct url_struct url_struct;
-
-#ifdef _WIN32
-    /* If we’re on Windows, ensure WSA is up. */
-    static int wsa_initialized = 0;
-    if (!wsa_initialized) {
-        WSADATA wsa_data;
-        if (WSAStartup(MAKEWORD(2, 2), &wsa_data) != 0) {
-            snprintf(errbuf, ERRBUF_SIZE, "WSAStartup(2.2) error");
-            return 1;
-        }
-        wsa_initialized = 1;
-    }
-#endif
-
     /* Break down the passed URL into host, port, path, protocol. */
     if (parse_url(&url_struct, url, errbuf)) {
         return 1;
@@ -566,7 +520,7 @@ int main(int argc, char *argv[])
             return 0;
         }
         else if (!strcmp(argv[i], "-V")) {
-            printf("Scrape version %s\n", SCRAPE_VERSION);
+            printf("Scrape version %s\n", DUMPTORRENT_VERSION);
             return 0;
         }
         else if (!strcmp(argv[i], "-w")) {
@@ -574,7 +528,7 @@ int main(int argc, char *argv[])
                 fprintf(stderr, "-w requires an integer argument.\n");
                 return 1;
             }
-            option_timeout = atoi(argv[i + 1]);
+            option_timeout = strtol(argv[i + 1], NULL, 10);
             if (option_timeout < 0) {
                 fprintf(stderr, "timeout must be non-negative.\n");
                 return 1;
