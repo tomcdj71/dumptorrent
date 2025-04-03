@@ -1,0 +1,91 @@
+name: Compile and upload on release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest 
+
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [ubuntu-latest]
+        build_type: [Release]
+        c_compiler: [gcc]
+        cpp_compiler: [g++]
+  
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set reusable strings
+        id: strings
+        shell: bash
+        run: |
+          mkdir -p "${{ github.workspace }}/build"
+          echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
+          echo "package-dir=${{ github.workspace }}/package" >> "$GITHUB_OUTPUT"
+          echo "artifact-dir=${{ github.workspace }}/artifacts/" >> "$GITHUB_OUTPUT"
+          version=$(grep -oP '(?<=VERSION=).*' VERSIONING)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        id: build
+        run: |
+          make -j$(nproc)
+          mv dumptorrent ${{ steps.strings.outputs.build-output-dir }}
+          echo "filename=dumptorrent_${{ steps.strings.outputs.version }}-${{ matrix.os }}_amd64" >> $GITHUB_OUTPUT
+          echo "filename: ${{ steps.strings.outputs.filename }}"
+
+      - name: Package Linux
+        working-directory: ${{ steps.strings.outputs.build-output-dir }}
+        if: matrix.os == 'ubuntu-latest'
+        run: | 
+          find ${{ steps.strings.outputs.build-output-dir }} -type f -exec file {} \; | grep ELF | cut -d: -f1 | xargs --no-run-if-empty -I {} sh -c 'strip --strip-unneeded "{}" && upx --best --lzma "{}"'
+          mkdir -p "${{ steps.strings.outputs.package-dir }}/DEBIAN/" && mkdir -p "${{ steps.strings.outputs.package-dir }}/usr/bin/"
+          cp -r ${{ steps.strings.outputs.build-output-dir }}/* "${{ steps.strings.outputs.package-dir }}/usr/bin/"
+          find "${{ steps.strings.outputs.package-dir }}/usr/" -type f -exec md5sum {} \; > ${{ steps.strings.outputs.package-dir }}/DEBIAN/md5sums
+          chmod +x ${{ steps.strings.outputs.package-dir }}/usr/bin/dumptorrent
+          installed_size=$(du -s -k "${{ steps.strings.outputs.package-dir }}/usr/" | cut -f1)
+          cat > "${{ steps.strings.outputs.package-dir }}/DEBIAN/control" <<EOF
+          Package: dumptorrent
+          Version: ${{ steps.strings.outputs.version }}-1build1
+          Architecture: amd64
+          Maintainer: Thomas Chauveau <contact.tomc@yahoo.com>
+          Installed-Size: $installed_size
+          Depends: libc6
+          Section: net
+          Priority: optional
+          Homepage: https://github.com/TheGoblinHero/dumptorrent/
+          Description: DumpTorrent is a non-interactive text mode program which displays BitTorrent .torrent file information, including size, file names, announce[-list], comment, publisher and info_hash. 
+            It can also query (scrape) tracker for current downloader count.
+            .
+            Compiler options:
+              * -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
+              * -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
+            .
+            Compiled on $(date +%Y-%m-%d).
+          EOF
+          dpkg-deb --build -Zxz -z9 -Sextreme ${{ steps.strings.outputs.package-dir }} ${{ steps.build.outputs.filename }}.deb
+          mkdir -p ${{ steps.strings.outputs.artifact-dir }}
+          mv ${{ steps.build.outputs.filename }}.deb ${{ steps.strings.outputs.artifact-dir }}
+      
+      - name: Get file list
+        id: file_list
+        run: |
+          echo "files=$(ls ${{ steps.strings.outputs.artifact-dir }})" >> $GITHUB_OUTPUT
+          echo "files: ${{ steps.file_list.outputs.files }}"
+
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: v${{ steps.strings.outputs.version }}
+          tag_name: v${{ steps.strings.outputs.version }}
+          generate_release_notes: true
+          files: |
+            ${{ steps.strings.outputs.artifact-dir }}/${{ steps.file_list.outputs.files }}
