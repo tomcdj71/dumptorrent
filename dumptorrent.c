@@ -228,11 +228,17 @@ static void show_torrent_info (struct benc_entity *root)
 		if (benc_lookup_string(info, "publisher")) {
 			printf("Publisher:      %s\n", benc_lookup_string(info, "publisher")->string.str);
 		}
+		if (benc_lookup_string(info, "publisher-url")) {
+			printf("Publisher URL:  %s\n", benc_lookup_string(info, "publisher-url")->string.str);
+		}
 		if (benc_lookup_string(root, "created by")) {
 			printf("Created By:     %s\n", benc_lookup_string(root, "created by")->string.str);
 		}
 		if (benc_lookup_string(root, "encoding")) {
 			printf("Encoding:       %s\n", benc_lookup_string(root, "encoding")->string.str);
+		}
+		if (benc_lookup_string(info, "private") && benc_lookup_string(info, "private")->integer) {
+			printf("Private:        yes\n");
 		}
 	}
 
@@ -269,6 +275,18 @@ static void show_torrent_info (struct benc_entity *root)
 					printf(", ");
 			}
 			printf("\n");
+		}
+	}
+
+	if (option_output == OUTPUT_FULL && benc_lookup_string(root, "nodes")) {
+		struct benc_entity *nodeslist;
+		printf("Nodes:\n");
+		for (nodeslist = benc_lookup_string(root, "nodes")->list.head; nodeslist != NULL; nodeslist = nodeslist->next) {
+			if (nodeslist->list.head && nodeslist->list.head->next) {
+				printf("                %s:%d\n",
+						nodeslist->list.head->string.str,
+						(int)nodeslist->list.head->next->integer);
+			}
 		}
 	}
 }

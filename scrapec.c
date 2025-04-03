@@ -137,8 +137,15 @@ static int parse_http_response (const char *buffer, int buffer_length, int *resu
 	ptr += 4;
 
 	root = benc_parse_memory(ptr, buffer + buffer_length - ptr, NULL, errbuf);
-	if (root == NULL)
+	if (root == NULL) {
+		// we just append the http data at the end of errbuf.
+		// TODO: encapsulated exception would be perfect here.
+		//       this requires change the errbuf interface.
+		snprintf(errbuf + strlen(errbuf), ERRBUF_SIZE - strlen(errbuf),
+				"\nhttp data: %s", ptr);
+		errbuf[ERRBUF_SIZE - 1] = '\0';
 		return 1;
+	}
 
 	entity = benc_lookup_string(root, "files");
 	if (entity == NULL || entity->dictionary.head == NULL)
@@ -162,7 +169,7 @@ errout2:
 	return 1;
 errout1:
 	snprintf(errbuf, ERRBUF_SIZE, "error in http response: %s", buffer);
-		errbuf[ERRBUF_SIZE - 1] = '\0';
+	errbuf[ERRBUF_SIZE - 1] = '\0';
 	return 1;
 }
 
