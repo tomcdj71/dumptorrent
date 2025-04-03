@@ -1,13 +1,15 @@
 #ifndef _SHA_H_
 #define _SHA_H_ 1
 
+#include <inttypes.h>
+
 /* The structure for storing SHS info */
 
 typedef struct 
 {
-	unsigned long int digest[ 5 ];            /* Message digest */
-	unsigned long int countLo, countHi;       /* 64-bit bit count */
-	unsigned long int data[ 16 ];             /* SHS data buffer */
+	uint32_t digest[ 5 ];            /* Message digest */
+	uint32_t countLo, countHi;       /* 64-bit bit count */
+	uint32_t data[ 16 ];             /* SHS data buffer */
 	int Endianness;
 } SHA_CTX;
 

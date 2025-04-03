@@ -144,10 +144,10 @@ void SHAInit(SHA_CTX *shsInfo)
    Note that this corrupts the shsInfo->data area */
 
 static void SHSTransform( digest, data )
-     unsigned long int *digest, *data ;
+     uint32_t *digest, *data ;
     {
-    unsigned long int A, B, C, D, E;     /* Local vars */
-    unsigned long int eData[ 16 ];       /* Expanded data */
+    uint32_t A, B, C, D, E;     /* Local vars */
+    uint32_t eData[ 16 ];       /* Expanded data */
 
     /* Set up first buffer and local data buffer */
     A = digest[ 0 ];
@@ -253,12 +253,12 @@ static void SHSTransform( digest, data )
 /* When run on a little-endian CPU we need to perform byte reversal on an
    array of long words. */
 
-static void longReverse(unsigned long int *buffer, int byteCount, int Endianness )
+static void longReverse(uint32_t *buffer, int byteCount, int Endianness )
 {
-    unsigned long int value;
+    uint32_t value;
 
     if (Endianness) return;
-    byteCount /= sizeof( unsigned long int );
+    byteCount /= sizeof( uint32_t );
     while( byteCount-- )
         {
         value = *buffer;
@@ -272,12 +272,12 @@ static void longReverse(unsigned long int *buffer, int byteCount, int Endianness
 
 void SHAUpdate(SHA_CTX *shsInfo, unsigned char *buffer, int count)
 {
-    unsigned long int tmp;
+    uint32_t tmp;
     int dataCount;
 
     /* Update bitcount */
     tmp = shsInfo->countLo;
-    if ( ( shsInfo->countLo = tmp + ( ( unsigned long int ) count << 3 ) ) < tmp )
+    if ( ( shsInfo->countLo = tmp + ( ( uint32_t ) count << 3 ) ) < tmp )
         shsInfo->countHi++;             /* Carry from low to high */
     shsInfo->countHi += count >> 29;
 
@@ -316,7 +316,7 @@ void SHAUpdate(SHA_CTX *shsInfo, unsigned char *buffer, int count)
     memcpy( (unsigned char *)shsInfo->data, (unsigned char *)buffer, count );
     }
 
-static void SHAtoByte(unsigned char *output, unsigned long int *input, unsigned int len)
+static void SHAtoByte(unsigned char *output, uint32_t *input, unsigned int len)
 {	/* Output SHA digest in byte array */
 	unsigned int i, j;
 

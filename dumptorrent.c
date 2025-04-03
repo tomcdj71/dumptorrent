@@ -3,7 +3,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
-
+#include <stdint.h>
+#include <inttypes.h>
 #include "common.h"
 #include "benc.h"
 #include "scrapec.h"
@@ -25,25 +26,19 @@ static char *option_field;
 int option_timeout = 0;
 char *option_tracker, *option_info_hash;
 
-static char *human_readable_number (long long int n)
+static char *human_readable_number (uint64_t n)
 {
-	static char buff[32];
-	char *ptr;
+	static char buff[51];
+	const char *suffix[] = {"B", "K", "M", "G", "T"};
+	double bytes = (double)n;
+	int i = 0;
 
-#ifdef _WIN32
-	ptr = buff + sprintf(buff, "%I64d", n);
-#else
-	ptr = buff + sprintf(buff, "%lld", n);
-#endif
-
-	if (n < 1000) {
-	} else if (n < 1024 * 1000) {
-		sprintf(ptr, " (%.3gK)", n / 1024.0);
-	} else if (n < 1024 * 1024 * 1000) {
-		sprintf(ptr, " (%.3gM)", n / (1024.0 * 1024.0));
-	} else {
-		sprintf(ptr, " (%.3gG)", n / (1024.0 * 1024.0 * 1024.0));
+	while (bytes > 1024) {
+		bytes = bytes / 1024.0;
+      i++;
 	}
+
+	snprintf(buff, 50, "%"PRIu64" (%.3g%s)", n, bytes, suffix[i]);
 	return buff;
 }
 
@@ -402,7 +397,7 @@ static int do_scrapec (void)
 
 static void print_help (const char *prog)
 {
-	printf("Dump Torrent Information:\n"
+	printf("Dump Torrent v1.3 Information:\n"
 			"Usage: %s [-t|-f field|-b|-v|-d|-s] [-w timeout] [-] files.torrent ...\n"
 			"       %s [-w timeout] -scrape url infohash\n"
 			"Options:\n"

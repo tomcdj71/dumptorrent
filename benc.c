@@ -85,6 +85,10 @@ struct benc_entity *benc_lookup_string (struct benc_entity *dictionary, const ch
 
 	length = strlen(key);
 	for (curr = dictionary->dictionary.head; curr != NULL && curr->next != NULL; curr = curr->next->next) {
+		if (curr->type == BENC_STRING && length + 6 == curr->string.length && strncmp(key, curr->string.str, length) == 0 && strncmp(".utf-8", curr->string.str + length, 6) == 0)
+			return curr->next;
+	}
+	for (curr = dictionary->dictionary.head; curr != NULL && curr->next != NULL; curr = curr->next->next) {
 		if (curr->type == BENC_STRING && length == curr->string.length && strncmp(key, curr->string.str, length) == 0)
 			return curr->next;
 	}
@@ -184,7 +188,7 @@ struct benc_entity *benc_parse_memory (const char *data, int length, int *peaten
 				}
 				if (*ptr == 'e')
 					break;
-				child_entity = benc_parse_memory(ptr, length - (int)ptr + (int)data, &eaten, errbuf);
+				child_entity = benc_parse_memory(ptr, length - (ptr - data), &eaten, errbuf);
 				if (child_entity == NULL) {
 					benc_free_entity(entity);
 					return NULL;
@@ -212,13 +216,13 @@ struct benc_entity *benc_parse_memory (const char *data, int length, int *peaten
 				}
 				if (*ptr == 'e')
 					break;
-				key = benc_parse_memory(ptr, length - (int)ptr + (int)data, &eaten, errbuf);
+				key = benc_parse_memory(ptr, length - (ptr - data), &eaten, errbuf);
 				if (key == NULL) {
 					benc_free_entity(entity);
 					return NULL;
 				}
 				ptr += eaten;
-				value = benc_parse_memory(ptr, length - (int)ptr + (int)data, &eaten, errbuf);
+				value = benc_parse_memory(ptr, length - (ptr - data), &eaten, errbuf);
 				if (value == NULL) {
 					benc_free_entity(key);
 					benc_free_entity(entity);
@@ -374,7 +378,7 @@ struct benc_entity *benc_parse_stream (FILE *stream, char *errbuf)
 				return NULL;
 			}
 
-			if (length > 1024 * 1024 || length < 0) {
+			if (length < 0) {
 				snprintf(errbuf, ERRBUF_SIZE, "string too long.");
 				return NULL;
 			}

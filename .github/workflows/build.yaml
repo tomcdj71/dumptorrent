@@ -36,9 +36,12 @@ jobs:
       - name: Build
         id: build
         run: |
-          make -j$(nproc)
-          mv dumptorrent ${{ steps.strings.outputs.build-output-dir }}
-          mv scrapec ${{ steps.strings.outputs.build-output-dir }}
+          cmake -B ${{ steps.strings.outputs.build-output-dir }} \
+            -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }} \
+            -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -S ${{ github.workspace }}
+          cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }} --parallel $(nproc)
           echo "filename=dumptorrent_${{ steps.strings.outputs.version }}-${{ matrix.os }}_amd64" >> $GITHUB_OUTPUT
           echo "filename: ${{ steps.strings.outputs.filename }}"
 
