@@ -70,6 +70,7 @@ static int check_torrent(struct benc_entity *root, char *errbuf)
         return 1;
     }
     if (memcmp(announce->string.str, "http://", 7) != 0 &&
+        memcmp(announce->string.str, "https://", 8) != 0 &&
         memcmp(announce->string.str, "udp://", 6) != 0) {
         snprintf(errbuf, ERRBUF_SIZE, "invalid announce url: \"%s\"", announce->string.str);
         errbuf[ERRBUF_SIZE - 1] = '\0';
