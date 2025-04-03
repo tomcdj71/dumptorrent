@@ -1,0 +1,10 @@
+all: dumptorrent.exe scrapec.exe
+
+dumptorrent.exe: dumptorrent.c scrapec.c scrapec.h benc.c benc.h sha1.c sha1.h common.h
+	cl /nologo /W3 /D_CRT_SECURE_NO_DEPRECATE /Fedumptorrent.exe dumptorrent.c scrapec.c benc.c sha1.c /link ws2_32.lib
+
+scrapec.exe: scrapec.c scrapec.h benc.c benc.h sha1.c sha1.h common.h
+	cl /nologo /W3 /D_CRT_SECURE_NO_DEPRECATE /DBUILD_MAIN /Fescrapec.exe scrapec.c benc.c sha1.c /link ws2_32.lib
+
+clean:
+	-del /Q /F dumptorrent.exe scrapec.exe dumptorrent.obj benc.obj sha1.obj scrapec.obj

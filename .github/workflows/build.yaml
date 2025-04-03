@@ -38,6 +38,7 @@ jobs:
         run: |
           make -j$(nproc)
           mv dumptorrent ${{ steps.strings.outputs.build-output-dir }}
+          mv scrapec ${{ steps.strings.outputs.build-output-dir }}
           echo "filename=dumptorrent_${{ steps.strings.outputs.version }}-${{ matrix.os }}_amd64" >> $GITHUB_OUTPUT
           echo "filename: ${{ steps.strings.outputs.filename }}"
 
@@ -45,11 +46,12 @@ jobs:
         working-directory: ${{ steps.strings.outputs.build-output-dir }}
         if: matrix.os == 'ubuntu-latest'
         run: | 
-          find ${{ steps.strings.outputs.build-output-dir }} -type f -exec file {} \; | grep ELF | cut -d: -f1 | xargs --no-run-if-empty -I {} sh -c 'strip --strip-unneeded "{}" && upx --best --lzma "{}"'
           mkdir -p "${{ steps.strings.outputs.package-dir }}/DEBIAN/" && mkdir -p "${{ steps.strings.outputs.package-dir }}/usr/bin/"
-          cp -r ${{ steps.strings.outputs.build-output-dir }}/* "${{ steps.strings.outputs.package-dir }}/usr/bin/"
+          find . -name "dumptorrent" -exec cp {} "${{ steps.strings.outputs.package-dir }}/usr/bin/" \;
+          find . -name "scrapec" -exec cp {} "${{ steps.strings.outputs.package-dir }}/usr/bin/" \;
+          find ${{ steps.strings.outputs.package-dir }} -type f -exec file {} \; | grep ELF | cut -d: -f1 | xargs --no-run-if-empty -I {} sh -c 'strip --strip-unneeded "{}" && upx --best --lzma "{}"'
           find "${{ steps.strings.outputs.package-dir }}/usr/" -type f -exec md5sum {} \; > ${{ steps.strings.outputs.package-dir }}/DEBIAN/md5sums
-          chmod +x ${{ steps.strings.outputs.package-dir }}/usr/bin/dumptorrent
+          chmod +x ${{ steps.strings.outputs.package-dir }}/usr/bin/dumptorrent ${{ steps.strings.outputs.package-dir }}/usr/bin/scrapec
           installed_size=$(du -s -k "${{ steps.strings.outputs.package-dir }}/usr/" | cut -f1)
           cat > "${{ steps.strings.outputs.package-dir }}/DEBIAN/control" <<EOF
           Package: dumptorrent
