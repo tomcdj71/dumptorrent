@@ -59,7 +59,8 @@ This will install the binaries into `/usr/local/bin`
 ### Install on windows
 
 > **Windows support has been removed.**  
-> `DumpTorrent` now targets Unix-like systems only (`Linux`). Use `WSL` if needed .
+> [Release v1.3.0](https://github.com/tomcdj71/dumptorrent/releases/tag/v1.3.0) includes compiled windows binary. But do not expect newer versions.
+> `DumpTorrent` now targets Unix-like systems only (`Linux`). Use `WSL` if needed.
 
 ---
 
