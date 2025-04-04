@@ -1,26 +1,71 @@
-# Description
-DumpTorrent is a non-interactive text mode program which displays BitTorrent .torrent file information, including size, file names, announce[-list], comment, publisher and info_hash. It can also query (scrape) tracker for current downloader count.
+# DumpTorrent
 
-It's forked from [original wuyongzheng version](https://sourceforge.net/projects/dumptorrent/)
+**DumpTorrent** is a non-interactive, command-line utility that displays detailed information about `.torrent` files. It extracts metadata such as:
 
-# Installation
+- Torrent name
+- Total size
+- File list
+- Tracker announce URLs and announce-list
+- Comment
+- Creator information
+- `info_hash`
 
-For Windows and Linux you could try the precompiled versions from the [Releases](https://github.com/TheGoblinHero/dumptorrent/releases). Otherwise, compile it yourself. 
+It can also perform **tracker scrape queries** to retrieve the current number of seeders, leechers, and completed downloads.
 
-## Linux Compilation
+This project is a maintained fork of [TheGoblinHero's version](https://github.com/TheGoblinHero/dumptorrent), itself originally based on [wuyongzheng's implementation](https://sourceforge.net/projects/dumptorrent/).
 
-```
+---
+
+## Installation
+
+### 🔧 Build from Source (Linux)
+
+Ensure required tools are installed:
+
+```bash
 apt-get install build-essential git
+```
+
+Then clone and build it:
+
+```bash
 git clone https://github.com/TheGoblinHero/dumptorrent.git
 cd dumptorrent
-make
+cmake -B build/ -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc -DCMAKE_BUILD_TYPE=Release -S .
+cmake --build build/ --config Release --parallel $(nproc)
 ```
 
-## ruTorrent Integration
+The resulting `dumptorrent` and `scrapec` binaries will be available in the `build` directory.
 
-1. Copy dumptorrent binary file somethere (system path is the best place).
+To install them system-wide:
+```bash
+chmod +x build/dumptorrent build/scrapec
+sudo mv build/dumptorrent build/scrapec /usr/local/bin
+```
 
-2. If needed, edit the configuration file for the dump plugin (rutorrent/plugins/dump/conf.php) and 
-update the path to match where you placed the binary. 
+> [!NOTE] 
+> You can move them to any directory in your `$PATH` instead `/usr/local/bin`.
 
-3. Restart ruTorrent.
+### Install Precompiled Package (Linux)
+
+Pre-built .deb packages are available on the [Releases page](https://github.com/MediaEase-binaries/dumptorrent-builds/releases):
+
+Download the latest release, then install it:
+`dpkg -i dumptorrent*.deb`
+
+This will install the binaries into `/usr/local/bin`
+
+
+### Install on windows
+
+> **Windows support has been removed.**  
+> `DumpTorrent` now targets Unix-like systems only (`Linux`). Use `WSL` if needed .
+
+---
+
+##  ruTorrent Integration
+
+To integrate `dumptorrent` with **ruTorrent's `Dump` plugin**:
+
+ 1) Edit the plugin config: Open `rutorrent/plugins/dump/conf.php` and update the path to the `dumptorrent` binary if needed.
+ 2) Restart ruTorrent or reload the plugin.
