@@ -9,6 +9,7 @@
 #include "benc.h"
 #include "scrapec.h"
 #include "torrent.h"
+#include "magnet.h"
 
 /* -------------------------------------------------------------------------
     VERSION DEFINITION
@@ -26,6 +27,10 @@ char        *option_info_hash = NULL;
 /* -------------------------------------------------------------------------
     UTILITY FUNCTIONS
    ------------------------------------------------------------------------- */
+static int is_magnet_uri(const char *str) {
+    return strncmp(str, "magnet:?", 8) == 0;
+
+}
 static int do_scrapec(void)
 {
     unsigned char info_hash[20];
@@ -167,7 +172,17 @@ int main(int argc, char *argv[])
             option_tracker  = argv[count + 1];
             option_info_hash = argv[count + 2];
             count += 2;
-        } 
+        }
+        else if (strcmp(argv[count], "-magnet") == 0) {
+            if (count + 1 >= argc) {
+                printf("Missing URI for -magnet.\n");
+                print_help(argv[0]);
+                return 1;
+            }
+            option_output = OUTPUT_MAGNET;
+            option_tracker = argv[count + 1];
+            count += 1;
+        }
         else if (argv[count][0] == '-' && argv[count][1] != '\0') {
             /* "-" alone means stdin, but anything else unrecognized is an error */
             if (strcmp(argv[count], "-") != 0) {
@@ -199,6 +214,59 @@ int main(int argc, char *argv[])
         }
     }
 
+    if (option_output == OUTPUT_MAGNET) {
+        unsigned char infohash[20];
+        char display_name[ERRBUF_SIZE];
+        char **trackers = NULL;
+        int tracker_count = 0;
+        char errbuf[ERRBUF_SIZE];
+    
+        if (parse_magnet_uri(option_tracker, infohash, &trackers, &tracker_count, display_name, errbuf) != 0) {
+            fprintf(stderr, "Magnet parse error: %s\n", errbuf);
+            return 1;
+        }
+        
+        if (display_name[0])
+            printf("Name:           %s\n", display_name);
+            printf("Magnet URI:     %s\n", option_tracker);
+            printf("Info Hash:      ");
+        for (int i = 0; i < 20; i++) printf("%02x", infohash[i]);
+            printf("\n");
+
+        if (tracker_count > 0) {
+            printf("Announce List:\n");
+            for (int i = 0; i < tracker_count; i++) {
+                printf("                %s\n", trackers[i]);
+            }
+        }
+        printf("\nScrapping test:\n");
+
+        int total_seeders = 0, total_leechers = 0, total_completed = 0;
+        int scrape_success = 0;
+        int result[3];
+
+        for (int i = 0; i < tracker_count; i++) {
+            if (scrapec(trackers[i], infohash, result, errbuf) != 0) {
+                printf("  %s\n", errbuf);
+            } else {
+                printf("                %s, (seeders=%d, completed=%d, leechers=%d)\n", trackers[i], result[0], result[1], result[2]);
+                total_seeders += result[0];
+                total_completed += result[1];
+                total_leechers += result[2];
+                scrape_success++;
+            }
+        }
+
+        if (scrape_success > 1) {
+            printf("\nTotal (from %d trackers): seeders=%d, completed=%d, leechers=%d\n",
+                scrape_success, total_seeders, total_completed, total_leechers);
+        }
+    
+        for (int i = 0; i < tracker_count; i++) free(trackers[i]);
+        free(trackers);
+        return 0;
+    }
+
     if (option_output == OUTPUT_SCRAPEC) {
         /* If we’re scraping a single infohash from a tracker, we shouldn’t have any files. */
         if (head != NULL) {
@@ -221,12 +289,73 @@ int main(int argc, char *argv[])
     for (curr = head; curr != NULL; /* advanced below */) {
         struct benc_entity *root;
         if (strcmp(curr->str, "-") == 0) {
-            /* read torrent data from stdin */
             root = benc_parse_stream(stdin, errbuf);
+        } else if (is_magnet_uri(curr->str)) {
+            unsigned char infohash[20];
+            char *display_name = malloc(ERRBUF_SIZE);
+            char **trackers = NULL;
+            int tracker_count = 0;
+            int result[3];
+            int total_seeders = 0, total_leechers = 0, total_completed = 0;
+            int scrape_success = 0;
+        
+            if (parse_magnet_uri(curr->str, infohash, &trackers, &tracker_count, display_name, errbuf) != 0) {
+                printf("%s: %s\n", curr->str, errbuf);
+                test_fail_count++;
+                free(display_name);
+                curr = curr->next;
+                continue;
+            }
+        
+            if (tracker_count == 0) {
+                printf("%s: no tracker found in magnet URI\n", curr->str);
+                free(display_name);
+                curr = curr->next;
+                continue;
+            }
+        
+            printf("%s:\n", curr->str);
+            if (display_name[0])
+                printf("%s:\n", curr->str);
+                printf("Name:           %s\n", display_name);
+                printf("Magnet URI:     %s\n", option_tracker);
+                printf("Info Hash:      ");
+            for (int i = 0; i < 20; i++) printf("%02x", infohash[i]);
+            printf("\n");
+        
+            if (tracker_count > 0) {
+                printf("Announce List:\n");
+                for (int i = 0; i < tracker_count; i++) {
+                    printf("                %s\n", trackers[i]);
+                }
+            }
+            printf("\nScrapping test:\n");
+        
+            for (int i = 0; i < tracker_count; i++) {
+                if (scrapec(trackers[i], infohash, result, errbuf) != 0) {
+                    printf("  %s\n", errbuf);
+                } else {
+                    printf("                %s, (seeders=%d, completed=%d, leechers=%d)\n", trackers[i], result[0], result[1], result[2]);
+                    total_seeders += result[0];
+                    total_completed += result[1];
+                    total_leechers += result[2];
+                    scrape_success++;
+                }
+            }
+        
+            if (scrape_success > 1) {
+                printf("Total (from %d trackers): seeders=%d, completed=%d, leechers=%d\n",
+                    scrape_success, total_seeders, total_completed, total_leechers);
+            }
+        
+            for (int i = 0; i < tracker_count; i++) free(trackers[i]);
+            free(trackers);
+            free(display_name);
+            curr = curr->next;
+            continue;
         } else {
             root = benc_parse_file(curr->str, errbuf);
         }
-
         switch (option_output) {
             case OUTPUT_TEST:
                 if (!root) {

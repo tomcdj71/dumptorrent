@@ -10,5 +10,6 @@
 #define OUTPUT_DUMP     5
 #define OUTPUT_SCRAPE   6
 #define OUTPUT_SCRAPEC  7
+#define OUTPUT_MAGNET   8
 
 #endif

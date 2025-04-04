@@ -6,6 +6,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <errno.h> 
 #include <netdb.h>
 #include "common.h"
 #include "benc.h"
@@ -202,101 +203,116 @@ errout1:
 /* -------------------------------------------------------------------------
    scrapec_http(): connect via TCP, send GET to the tracker’s /scrape URL
    ------------------------------------------------------------------------- */
+   static int scrapec_http_internal(const char *host, int port, const char *path,
+    const unsigned char *info_hash, int *result,
+    char *errbuf, const char *http_version);
+
 static int scrapec_http(const char *host, int port, const char *path,
-                        const unsigned char *info_hash, int *result, char *errbuf)
+const unsigned char *info_hash, int *result, char *errbuf)
 {
-    char buffer[8192];
-    int buffer_length;
-    struct hostent *hostent;
-    int sock;
-    struct sockaddr_in addr;
-
-    /* Build the HTTP GET request (info_hash must be escaped as %XX bytes) */
-    buffer_length = snprintf(buffer, sizeof(buffer),
-        "GET %s?info_hash="
-        "%%%02X%%%02X%%%02X%%%02X%%%02X%%%02X%%%02X%%%02X%%%02X%%%02X"
-        "%%%02X%%%02X%%%02X%%%02X%%%02X%%%02X%%%02X%%%02X%%%02X%%%02X"
-        " HTTP/1.0\r\n"
-        "Accept: */*\r\n"
-        "Connection: close\r\n"
-        "User-Agent: dumptorrent-scrape\r\n"
-        "Host: %s:%d\r\n\r\n",
-        path,
-        info_hash[0], info_hash[1], info_hash[2], info_hash[3],
-        info_hash[4], info_hash[5], info_hash[6], info_hash[7],
-        info_hash[8], info_hash[9], info_hash[10], info_hash[11],
-        info_hash[12], info_hash[13], info_hash[14], info_hash[15],
-        info_hash[16], info_hash[17], info_hash[18], info_hash[19],
-        host, port);
-
-    /* DNS resolution */
-    hostent = gethostbyname(host);
-    if (!hostent || hostent->h_length != 4 || !hostent->h_addr_list[0]) {
-        snprintf(errbuf, ERRBUF_SIZE, "cannot resolve hostname: '%s'", host);
-        return 1;
-    }
-
-    /* Prepare sockaddr_in */
-    memcpy(&addr.sin_addr, hostent->h_addr_list[0], 4);
-    addr.sin_port = htons((unsigned short) port);
-    addr.sin_family = AF_INET;
-
-    /* Create socket */
-    sock = socket(PF_INET, SOCK_STREAM, 0);
-    if (sock == -1) {
-        snprintf(errbuf, ERRBUF_SIZE, "socket() error");
-        return 1;
-    }
-
-    /* Set timeouts if any */
-    if (option_timeout != 0) {
-        struct timeval timeoutval = {option_timeout, 0};
-        if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeoutval, sizeof(timeoutval)) == -1 ||
-            setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &timeoutval, sizeof(timeoutval)) == -1)
-        {
-            snprintf(errbuf, ERRBUF_SIZE, "setsockopt timeout error");
-            CLOSESOCKET(sock);
-            return 1;
-        }
-    }
-
-    /* Connect */
-    if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
-        snprintf(errbuf, ERRBUF_SIZE, "connect() error to %s:%d", host, port);
-        CLOSESOCKET(sock);
-        return 1;
-    }
-
-    /* Send GET request */
-    if (send(sock, buffer, buffer_length, 0) != buffer_length) {
-        snprintf(errbuf, ERRBUF_SIZE, "send() error");
-        CLOSESOCKET(sock);
-        return 1;
-    }
-
-    /* Read response into buffer */
-    buffer_length = 0;
-    for (;;) {
-        int len = (int)recv(sock, buffer + buffer_length, sizeof(buffer) - buffer_length, 0);
-        if (len < 0) {
-            snprintf(errbuf, ERRBUF_SIZE, "recv() error");
-            CLOSESOCKET(sock);
-            return 1;
-        }
-        if (len == 0) break; /* remote closed */
-        buffer_length += len;
-        if (buffer_length >= (int)sizeof(buffer)) {
-            snprintf(errbuf, ERRBUF_SIZE, "response too large for buffer");
-            CLOSESOCKET(sock);
-            return 1;
-        }
-    }
-    CLOSESOCKET(sock);
-
-    /* Null-terminate and parse HTTP response for the bencoded data. */
-    buffer[buffer_length] = '\0';
-    return parse_http_response(buffer, buffer_length, result, errbuf);
+return scrapec_http_internal(host, port, path, info_hash, result, errbuf, "1.1");
 }
+
+static int scrapec_http_internal(const char *host, int port, const char *path,
+    const unsigned char *info_hash, int *result,
+    char *errbuf, const char *http_version)
+{
+char buffer[8192];
+int buffer_length;
+struct hostent *hostent;
+int sock;
+struct sockaddr_in addr;
+
+/* Build the HTTP GET request */
+buffer_length = snprintf(buffer, sizeof(buffer),
+"GET %s?info_hash="
+"%%%02X%%%02X%%%02X%%%02X%%%02X%%%02X%%%02X%%%02X%%%02X%%%02X"
+"%%%02X%%%02X%%%02X%%%02X%%%02X%%%02X%%%02X%%%02X%%%02X%%%02X"
+" HTTP/%s\r\n"
+"Accept: */*\r\n"
+"Connection: close\r\n"
+"User-Agent: dumptorrent-scrape\r\n"
+"Host: %s:%d\r\n\r\n",
+path,
+info_hash[0], info_hash[1], info_hash[2], info_hash[3],
+info_hash[4], info_hash[5], info_hash[6], info_hash[7],
+info_hash[8], info_hash[9], info_hash[10], info_hash[11],
+info_hash[12], info_hash[13], info_hash[14], info_hash[15],
+info_hash[16], info_hash[17], info_hash[18], info_hash[19],
+http_version, host, port);
+
+hostent = gethostbyname(host);
+if (!hostent || hostent->h_length != 4 || !hostent->h_addr_list[0]) {
+snprintf(errbuf, ERRBUF_SIZE, "cannot resolve hostname: '%s'", host);
+return 1;
+}
+
+memcpy(&addr.sin_addr, hostent->h_addr_list[0], 4);
+addr.sin_port = htons((unsigned short) port);
+addr.sin_family = AF_INET;
+
+sock = socket(PF_INET, SOCK_STREAM, 0);
+if (sock == -1) {
+snprintf(errbuf, ERRBUF_SIZE, "socket() error");
+return 1;
+}
+
+if (option_timeout != 0) {
+struct timeval timeoutval = {option_timeout, 0};
+if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeoutval, sizeof(timeoutval)) == -1 ||
+setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &timeoutval, sizeof(timeoutval)) == -1)
+{
+snprintf(errbuf, ERRBUF_SIZE, "setsockopt timeout error");
+CLOSESOCKET(sock);
+return 1;
+}
+}
+
+if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
+snprintf(errbuf, ERRBUF_SIZE, "connect() error to %s:%d: %s", host, port, strerror(errno));
+CLOSESOCKET(sock);
+return 1;
+}
+
+if (send(sock, buffer, buffer_length, 0) != buffer_length) {
+snprintf(errbuf, ERRBUF_SIZE, "send() error");
+CLOSESOCKET(sock);
+return 1;
+}
+
+buffer_length = 0;
+for (;;) {
+int len = (int)recv(sock, buffer + buffer_length, sizeof(buffer) - buffer_length - 1, 0);
+if (len < 0) {
+snprintf(errbuf, ERRBUF_SIZE, "recv() error");
+CLOSESOCKET(sock);
+return 1;
+}
+if (len == 0) break;
+buffer_length += len;
+if (buffer_length >= (int)sizeof(buffer) - 1) {
+snprintf(errbuf, ERRBUF_SIZE, "response too large for buffer");
+CLOSESOCKET(sock);
+return 1;
+}
+}
+CLOSESOCKET(sock);
+
+buffer[buffer_length] = '\0';
+
+// Check for HTTP 505 response
+if (strncmp(buffer, "HTTP/1.1 505", 12) == 0 || strncmp(buffer, "HTTP/1.0 505", 12) == 0) {
+if (strcmp(http_version, "1.0") != 0) {
+// Retry with HTTP/1.0
+return scrapec_http_internal(host, port, path, info_hash, result, errbuf, "1.0");
+}
+snprintf(errbuf, ERRBUF_SIZE, "HTTP version not supported (505) even after fallback");
+return 1;
+}
+
+return parse_http_response(buffer, buffer_length, result, errbuf);
+}
+
 
 /* -------------------------------------------------------------------------
    scrapec_udp(): connect via UDP, do the standard handshake for UDP trackers
@@ -367,7 +383,7 @@ static int scrapec_udp(const char *host, int port,
 
     /* 'connect' UDP (really just sets default peer) */
     if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
-        snprintf(errbuf, ERRBUF_SIZE, "connect() error (UDP) to %s:%d", host, port);
+        snprintf(errbuf, ERRBUF_SIZE, "connect() error (UDP) to %s:%d: %s", host, port, strerror(errno));
         CLOSESOCKET(sock);
         return 1;
     }
@@ -384,8 +400,13 @@ static int scrapec_udp(const char *host, int port,
     }
 
     /* Receive connect response (the “udp_connect_output”) */
-    if (recv(sock, &buffer, sizeof(buffer), 0) < (int)sizeof(buffer.co)) {
-        snprintf(errbuf, ERRBUF_SIZE, "recv() error in UDP connect");
+    int recv_len = recv(sock, &buffer, sizeof(buffer), 0);
+    if (recv_len < (int)sizeof(buffer.co)) {
+        if (recv_len < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+            snprintf(errbuf, ERRBUF_SIZE, "UDP connect: no response (timeout)");
+        } else {
+            snprintf(errbuf, ERRBUF_SIZE, "recv() error in UDP connect: %s", strerror(errno));
+        }
         CLOSESOCKET(sock);
         return 1;
     }
@@ -411,8 +432,13 @@ static int scrapec_udp(const char *host, int port,
     }
 
     /* Receive scrape response (the “udp_scrape_output”) */
-    if (recv(sock, &buffer, sizeof(buffer), 0) < (int)sizeof(buffer.so)) {
-        snprintf(errbuf, ERRBUF_SIZE, "recv() error in UDP scrape");
+    recv_len = recv(sock, &buffer, sizeof(buffer), 0);
+    if (recv_len < (int)sizeof(buffer.so)) {
+        if (recv_len < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+            snprintf(errbuf, ERRBUF_SIZE, "UDP scrape: no response (timeout)");
+        } else {
+            snprintf(errbuf, ERRBUF_SIZE, "recv() error in UDP scrape");
+        }
         CLOSESOCKET(sock);
         return 1;
     }

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 project(dumptorrent)
-set(DUMPTORRENT_VERSION "1.6.0")
+set(DUMPTORRENT_VERSION "1.7.0")
 include_directories(${PROJECT_SOURCE_DIR}/include)
 
 # ------------------------------------------------------------------------------
@@ -12,6 +12,7 @@ set(DUMPTORRENT_SOURCES
     src/benc.c
     src/scrapec.c
     src/sha1.c
+    src/magnet.c
 )
 
 add_executable(dumptorrent
