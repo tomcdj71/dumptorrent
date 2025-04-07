@@ -80,7 +80,7 @@ jobs:
           Depends: libc6
           Section: net
           Priority: optional
-          Homepage: https://github.com/TheGoblinHero/dumptorrent/
+          Homepage: https://github.com/tomcdj71/dumptorrent/
           Description: DumpTorrent is a non-interactive text mode program which displays BitTorrent .torrent file information, including size, file names, announce[-list], comment, publisher and info_hash. 
             It can also query (scrape) tracker for current downloader count.
             .
