@@ -62,6 +62,95 @@ This will install the binaries into `/usr/local/bin`
 > [Release v1.3.0](https://github.com/tomcdj71/dumptorrent/releases/tag/v1.3.0) includes compiled windows binary. But do not expect newer versions.
 > `DumpTorrent` now targets Unix-like systems only (`Linux`). Use `WSL` if needed.
 
+### Create your own .deb Package
+
+You can easily create your own Debian package for DumpTorrent using FPM (Effing Package Management). This method is simpler than traditional Debian packaging as it doesn't require complex control files.
+
+#### Prerequisites
+
+Install FPM and required dependencies:
+
+```bash
+sudo apt-get update
+sudo apt-get install ruby ruby-dev build-essential
+sudo gem install fpm
+```
+
+#### Build and Package
+
+1. First, compile DumpTorrent from source:
+
+```bash
+# Clone the repository
+git clone https://github.com/tomcdj71/dumptorrent.git
+cd dumptorrent
+
+# Build the binaries
+cmake -B build/ -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc -DCMAKE_BUILD_TYPE=Release -S .
+cmake --build build/ --config Release --parallel $(nproc)
+```
+
+2. Create a staging directory structure:
+
+```bash
+# Create necessary directories
+mkdir -p staging/usr/bin
+
+# Copy binaries to staging area
+cp build/dumptorrent build/scrapec staging/usr/bin/
+
+# Make binaries executable
+chmod +x staging/usr/bin/dumptorrent staging/usr/bin/scrapec
+```
+
+3. Build the .deb package with FPM:
+
+```bash
+# Get version from CMakeLists.txt
+VERSION=$(grep -oP '(?<=set\(DUMPTORRENT_VERSION ")[^"]*' CMakeLists.txt)
+
+# Create the package
+fpm -s dir -t deb -C staging \
+  --name dumptorrent \
+  --version $VERSION \
+  --architecture amd64 \
+  --description "DumpTorrent is a command-line utility that displays detailed information about .torrent files" \
+  --url "https://github.com/tomcdj71/dumptorrent" \
+  --maintainer "Your Name <your.email@example.com>" \
+  --license "MIT" \
+  --depends "libc6" \
+  --deb-compression xz \
+  --deb-priority optional \
+  --category net \
+  usr/bin
+```
+
+This will create a file named `dumptorrent_$VERSION_amd64.deb` in your current directory.
+
+4. Install and test your package:
+
+```bash
+sudo dpkg -i dumptorrent_*.deb
+dumptorrent --version
+```
+
+#### Advanced Options
+
+For additional optimizations, you can strip and compress the binaries before packaging:
+
+```bash
+# Strip debug symbols
+strip --strip-unneeded staging/usr/bin/dumptorrent staging/usr/bin/scrapec
+
+# Install UPX (optional)
+sudo apt-get install upx
+
+# Compress binaries with UPX
+upx --best --lzma staging/usr/bin/dumptorrent staging/usr/bin/scrapec
+```
+
+These steps follow a similar approach to the CI/CD pipeline used in the GitHub Actions workflow.
+
 ---
 
 ##  ruTorrent Integration

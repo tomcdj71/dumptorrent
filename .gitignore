@@ -1,0 +1,4 @@
+build/
+staging/
+*.nmake
+*.deb
