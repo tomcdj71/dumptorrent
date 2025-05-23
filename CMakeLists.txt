@@ -41,3 +41,8 @@ target_compile_definitions(scrapec
         BUILD_MAIN
         DUMPTORRENT_VERSION="${DUMPTORRENT_VERSION}"
 )
+
+# ------------------------------------------------------------------------------
+# installation
+# ------------------------------------------------------------------------------
+install(TARGETS dumptorrent scrapec)
