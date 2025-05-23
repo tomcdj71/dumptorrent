@@ -159,3 +159,7 @@ To integrate `dumptorrent` with **ruTorrent's `Dump` plugin**:
 
  1) Edit the plugin config: Open `rutorrent/plugins/dump/conf.php` and update the path to the `dumptorrent` binary if needed.
  2) Restart ruTorrent or reload the plugin.
+
+## License
+
+As per the original [project](https://sourceforge.net/projects/dumptorrent/), dumptorrent is licensed with the GPL2 license.
