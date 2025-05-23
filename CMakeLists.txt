@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.10)
 project(dumptorrent)
 set(DUMPTORRENT_VERSION "1.7.0")
 include_directories(${PROJECT_SOURCE_DIR}/include)
