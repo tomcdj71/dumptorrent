@@ -143,8 +143,7 @@ void SHAInit(SHA_CTX *shsInfo)
 
    Note that this corrupts the shsInfo->data area */
 
-static void SHSTransform( digest, data )
-     uint32_t *digest, *data ;
+static void SHSTransform(uint32_t *digest, uint32_t *data)
     {
     uint32_t A, B, C, D, E;     /* Local vars */
     uint32_t eData[ 16 ];       /* Expanded data */
