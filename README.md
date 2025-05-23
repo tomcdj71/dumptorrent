@@ -117,7 +117,7 @@ fpm -s dir -t deb -C staging \
   --description "DumpTorrent is a command-line utility that displays detailed information about .torrent files" \
   --url "https://github.com/tomcdj71/dumptorrent" \
   --maintainer "Your Name <your.email@example.com>" \
-  --license "MIT" \
+  --license "GPL2" \
   --depends "libc6" \
   --deb-compression xz \
   --deb-priority optional \
