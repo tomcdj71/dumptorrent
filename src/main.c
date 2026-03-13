@@ -82,7 +82,7 @@ static int do_scrapec(void)
 static void print_help(const char *prog)
 {
     printf("Dump Torrent v%s\n", DUMPTORRENT_VERSION);
-    printf("Usage: %s [options] [--] <files.torrent...>\n", prog);
+    printf("Usage: %s [options] <files.torrent...>\n", prog);
     printf("  -t: validate torrent files only (test mode)\n");
     printf("  -f <field>: output a single field (e.g. 'name'), one per file\n");
     printf("  -b: brief dump\n");
