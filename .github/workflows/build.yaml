@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest 
+    runs-on: ubuntu-latest
 
     strategy:
       fail-fast: true
@@ -18,9 +18,9 @@ jobs:
         build_type: [Release]
         c_compiler: [gcc]
         cpp_compiler: [g++]
-  
+
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set reusable strings
         id: strings
@@ -32,21 +32,21 @@ jobs:
           echo "artifact-dir=${{ github.workspace }}/artifacts/" >> "$GITHUB_OUTPUT"
           version=$(grep -oP '(?<=set\(DUMPTORRENT_VERSION ")[^"]*' CMakeLists.txt)
           echo "version=$version" >> "$GITHUB_OUTPUT"
-      
+
       - name: Check if version is lower than tag
         id: check_version
         shell: bash
         run: |
-            latest_tag=$(git tag --sort=-v:refname | head -n 1)
-            echo "latest_tag=$latest_tag" >> "$GITHUB_OUTPUT"
-            if [ -z "$latest_tag" ]; then
-            echo "No tags found. Proceeding with build."
-            elif [ "$latest_tag" != "v${{ steps.strings.outputs.version }}" ]; then
-            echo "Version in CMakeLists.txt is higher than the latest tag. Proceeding with build."
-            else
-            echo "Version in CMakeLists.txt is lower or equal to the latest tag. Skipping build."
-            exit 1
-            fi
+          latest_tag=$(git tag --sort=-v:refname | head -n 1)
+          echo "latest_tag=$latest_tag" >> "$GITHUB_OUTPUT"
+          if [ -z "$latest_tag" ]; then
+          echo "No tags found. Proceeding with build."
+          elif [ "$latest_tag" != "v${{ steps.strings.outputs.version }}" ]; then
+          echo "Version in CMakeLists.txt is higher than the latest tag. Proceeding with build."
+          else
+          echo "Version in CMakeLists.txt is lower or equal to the latest tag. Skipping build."
+          exit 1
+          fi
 
       - name: Build
         id: build
@@ -63,7 +63,7 @@ jobs:
       - name: Package Linux
         working-directory: ${{ steps.strings.outputs.build-output-dir }}
         if: matrix.os == 'ubuntu-latest'
-        run: | 
+        run: |
           mkdir -p "${{ steps.strings.outputs.package-dir }}/DEBIAN/" && mkdir -p "${{ steps.strings.outputs.package-dir }}/usr/bin/"
           find . -name "dumptorrent" -exec cp {} "${{ steps.strings.outputs.package-dir }}/usr/bin/" \;
           find . -name "scrapec" -exec cp {} "${{ steps.strings.outputs.package-dir }}/usr/bin/" \;
@@ -93,16 +93,15 @@ jobs:
           dpkg-deb --build -Zxz -z9 -Sextreme ${{ steps.strings.outputs.package-dir }} ${{ steps.build.outputs.filename }}.deb
           mkdir -p ${{ steps.strings.outputs.artifact-dir }}
           mv ${{ steps.build.outputs.filename }}.deb ${{ steps.strings.outputs.artifact-dir }}
-      
+
       - name: Get file list
         id: file_list
         run: |
           echo "files=$(ls ${{ steps.strings.outputs.artifact-dir }})" >> $GITHUB_OUTPUT
           echo "files: ${{ steps.file_list.outputs.files }}"
 
-      
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: v${{ steps.strings.outputs.version }}
           tag_name: v${{ steps.strings.outputs.version }}
