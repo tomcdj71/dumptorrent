@@ -20,7 +20,7 @@ jobs:
         cpp_compiler: [g++]
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set reusable strings
         id: strings
