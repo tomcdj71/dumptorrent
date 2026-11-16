@@ -12,6 +12,8 @@
 
 It can also perform **tracker scrape queries** to retrieve the current number of seeders, leechers, and completed downloads.
 
+Use `--json` / `-j` / `-J` to print a single JSON object per torrent (`name`, `infoHash`, `pieceLength`, `length`, and related fields when present).
+
 This project is a maintained fork of [TheGoblinHero's version](https://github.com/TheGoblinHero/dumptorrent), itself originally based on [wuyongzheng's implementation](https://sourceforge.net/projects/dumptorrent/).
 
 ---

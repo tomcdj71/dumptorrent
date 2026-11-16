@@ -117,6 +117,148 @@ void print_field(struct benc_entity *root)
     printf("not implemented\n");
 }
 
+static void json_print_string(const char *s)
+{
+    putchar('"');
+    if (s) {
+        for (; *s; s++) {
+            unsigned char c = (unsigned char)*s;
+            switch (c) {
+            case '"':
+            case '\\':
+                putchar('\\');
+                putchar(c);
+                break;
+            case '\b':
+                fputs("\\b", stdout);
+                break;
+            case '\f':
+                fputs("\\f", stdout);
+                break;
+            case '\n':
+                fputs("\\n", stdout);
+                break;
+            case '\r':
+                fputs("\\r", stdout);
+                break;
+            case '\t':
+                fputs("\\t", stdout);
+                break;
+            default:
+                if (c < 0x20)
+                    printf("\\u%04x", c);
+                else
+                    putchar(c);
+                break;
+            }
+        }
+    }
+    putchar('"');
+}
+
+void print_torrent_json(struct benc_entity *root, const char *path)
+{
+    struct benc_entity *announce, *info, *name, *piece_length, *length;
+    struct benc_entity *comment, *priv, *files;
+    unsigned char info_hash[20];
+    long long int total_length = 0;
+    int first_file = 1;
+    int i;
+
+    if (root == NULL || root->type != BENC_DICTIONARY) {
+        fputs("{\"error\":\"invalid torrent\"}\n", stdout);
+        return;
+    }
+
+    announce = benc_lookup_string(root, "announce");
+    info = benc_lookup_string(root, "info");
+    if (info == NULL || info->type != BENC_DICTIONARY) {
+        fputs("{\"error\":\"missing info\"}\n", stdout);
+        return;
+    }
+    name = benc_lookup_string(info, "name");
+    piece_length = benc_lookup_string(info, "piece length");
+    length = benc_lookup_string(info, "length");
+    files = benc_lookup_string(info, "files");
+    comment = benc_lookup_string(root, "comment");
+    priv = benc_lookup_string(info, "private");
+
+    if (length != NULL && length->type == BENC_INTEGER) {
+        total_length = length->integer;
+    } else if (files != NULL && files->type == BENC_LIST) {
+        for (struct benc_entity *item = files->list.head; item != NULL; item = item->next) {
+            struct benc_entity *flen = benc_lookup_string(item, "length");
+            if (flen && flen->type == BENC_INTEGER)
+                total_length += flen->integer;
+        }
+    }
+
+    benc_sha1_entity(info, info_hash);
+
+    fputs("{\"name\":", stdout);
+    json_print_string(name && name->type == BENC_STRING ? name->string.str : "");
+    fputs(",\"infoHash\":\"", stdout);
+    for (i = 0; i < 20; i++)
+        printf("%02X", info_hash[i]);
+    fputs("\",\"pieceLength\":", stdout);
+    if (piece_length && piece_length->type == BENC_INTEGER)
+        printf("%lld", piece_length->integer);
+    else
+        fputs("0", stdout);
+    printf(",\"length\":%lld", total_length);
+
+    if (priv && priv->type == BENC_INTEGER && priv->integer)
+        fputs(",\"private\":true", stdout);
+
+    if (announce && announce->type == BENC_STRING) {
+        fputs(",\"announce\":", stdout);
+        json_print_string(announce->string.str);
+    }
+    if (comment && comment->type == BENC_STRING) {
+        fputs(",\"comment\":", stdout);
+        json_print_string(comment->string.str);
+    }
+    if (path && path[0] && strcmp(path, "-") != 0) {
+        fputs(",\"path\":", stdout);
+        json_print_string(path);
+    }
+
+    if (files != NULL && files->type == BENC_LIST && length == NULL) {
+        fputs(",\"files\":[", stdout);
+        for (struct benc_entity *item = files->list.head; item != NULL; item = item->next) {
+            struct benc_entity *pathlist = benc_lookup_string(item, "path");
+            struct benc_entity *flen = benc_lookup_string(item, "length");
+            char joined[4096];
+            size_t off = 0;
+            joined[0] = '\0';
+            if (pathlist && pathlist->type == BENC_LIST) {
+                for (struct benc_entity *p = pathlist->list.head; p != NULL; p = p->next) {
+                    if (p->type != BENC_STRING)
+                        continue;
+                    if (off > 0 && off + 1 < sizeof(joined))
+                        joined[off++] = '/';
+                    size_t n = (size_t)p->string.length;
+                    if (off + n >= sizeof(joined))
+                        n = sizeof(joined) - off - 1;
+                    memcpy(joined + off, p->string.str, n);
+                    off += n;
+                    joined[off] = '\0';
+                }
+            }
+            if (!first_file)
+                putchar(',');
+            first_file = 0;
+            fputs("{\"path\":", stdout);
+            json_print_string(joined);
+            printf(",\"length\":%lld}", flen && flen->type == BENC_INTEGER ? flen->integer : 0LL);
+        }
+        putchar(']');
+    }
+
+    fputs("}\n", stdout);
+    fflush(stdout);
+}
+
 void show_torrent_info(struct benc_entity *root)
 {
     struct benc_entity *announce, *info, *name, *piece_length, *length;

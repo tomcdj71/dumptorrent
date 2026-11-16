@@ -9,6 +9,9 @@ int check_torrent(struct benc_entity *root, char *errbuf);
 // Show torrent info (e.g. name, size, etc.)
 void show_torrent_info(struct benc_entity *root);
 
+// Print a JSON summary of the torrent (one object on stdout).
+void print_torrent_json(struct benc_entity *root, const char *path);
+
 // Print a single field (brief usage for scripting)
 void print_field(struct benc_entity *root);
 

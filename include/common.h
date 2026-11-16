@@ -11,5 +11,6 @@
 #define OUTPUT_SCRAPE   6
 #define OUTPUT_SCRAPEC  7
 #define OUTPUT_MAGNET   8
+#define OUTPUT_JSON     9
 
 #endif

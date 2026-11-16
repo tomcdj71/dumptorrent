@@ -88,6 +88,7 @@ static void print_help(const char *prog)
     printf("  -b: brief dump\n");
     printf("  -v: full dump\n");
     printf("  -d: raw hierarchical dump\n");
+    printf("  -j, -J, --json: print a JSON summary (one object per file)\n");
     printf("  -s: show scrape info (via built-in logic)\n");
     printf("  -w <timeout>: network timeout in seconds\n");
     printf("  -scrape <url> <infohash>: scrape a particular infohash from the given tracker\n");
@@ -95,6 +96,7 @@ static void print_help(const char *prog)
     printf("  -h: print this help message\n\n");
     printf("Examples:\n");
     printf("  %s somefile.torrent                 (default output)\n", prog);
+    printf("  %s --json somefile.torrent          (JSON summary)\n", prog);
     printf("  %s -t file1.torrent file2.torrent   (test each file)\n", prog);
     printf("  %s -scrape http://tracker/ann ...   (scrape a specific infohash)\n", prog);
 }
@@ -146,7 +148,12 @@ int main(int argc, char *argv[])
         } 
         else if (strcmp(argv[count], "-d") == 0) {
             option_output = OUTPUT_DUMP;
-        } 
+        }
+        else if (strcmp(argv[count], "-j") == 0 ||
+                 strcmp(argv[count], "-J") == 0 ||
+                 strcmp(argv[count], "--json") == 0) {
+            option_output = OUTPUT_JSON;
+        }
         else if (strcmp(argv[count], "-s") == 0) {
             option_output = OUTPUT_SCRAPE;
         } 
@@ -403,6 +410,23 @@ int main(int argc, char *argv[])
                 else
                     printf("%s\n", errbuf);
                 printf("\n");
+                break;
+
+            case OUTPUT_JSON:
+                if (!root) {
+                    printf("{\"error\":");
+                    /* reuse errbuf as a JSON string value */
+                    putchar('"');
+                    for (const char *p = errbuf; *p; p++) {
+                        if (*p == '"' || *p == '\\')
+                            putchar('\\');
+                        putchar(*p);
+                    }
+                    printf("\",\"path\":\"%s\"}\n", curr->str);
+                    test_fail_count++;
+                } else {
+                    print_torrent_json(root, curr->str);
+                }
                 break;
 
             case OUTPUT_SCRAPE:
