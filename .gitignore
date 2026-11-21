@@ -1,4 +1,5 @@
 build/
+build-fleet/
 staging/
 *.nmake
 *.deb
